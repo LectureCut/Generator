@@ -1,0 +1,79 @@
+name: Build Release
+
+on:
+  push:
+    tags:
+      - v*
+  workflow_dispatch:
+
+permissions: write-all
+
+env:
+  # Customize the CMake build type here (Release, Debug, RelWithDebInfo, etc.)
+  BUILD_TYPE: Release
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+      fail-fast: false
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          submodules: recursive
+
+      - name: Get Conan
+        uses: turtlebrowser/get-conan@v1.2
+
+      - name: Cache Conan packages
+        id: cache-conan
+        uses: actions/cache@v3
+        with:
+          path: ~/.conan2
+          key: ${{ matrix.os }}-conan
+
+      - name: Configure Conan Profile
+        if: steps.cache-conan.outputs.cache-hit != 'true'
+        run: conan profile detect --force
+
+      - name: Configure Conan System Dependencies
+        if: steps.cache-conan.outputs.cache-hit != 'true' && matrix.os == 'ubuntu-latest'
+        run: |
+          echo "tools.system.package_manager:mode = install" > ~/.conan2/global.conf
+          echo "tools.system.package_manager:sudo = True" >> ~/.conan2/global.conf
+
+      - name: Install Visual Studio 16 2019
+        if: matrix.os == 'windows-latest'
+        uses: microsoft/setup-msbuild@v1.1
+        with:
+          vs-version: '16.0'
+          msbuild-architecture: x64
+
+      - name: Compile
+        run: conan build . -s build_type=${{env.BUILD_TYPE}} ${{ matrix.os == 'windows-latest' && '-s compiler="msvc"' || ''}} -of build --build=missing
+      
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: generator-${{ matrix.os }}
+          path: build/${{ matrix.os == 'windows-latest' && 'Release/generator.dll' || 'libgenerator.so'}}
+
+  release:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download Artifacts
+        uses: actions/download-artifact@v3
+      - name: Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            ./generator-windows-latest/generator.dll
+            ./generator-ubuntu-latest/libgenerator.so
+          draft: false
+          prerelease: false
