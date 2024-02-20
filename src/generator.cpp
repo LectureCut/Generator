@@ -151,7 +151,7 @@ result generate(
   }), cuts.end());
 
   // return the cuts
-  cut* result_cuts = new cut[cuts.size()];
+  cut* result_cuts = (cut*) malloc(sizeof(cut) * cuts.size());
   for (size_t i = 0; i < cuts.size(); i++) {
     result_cuts[i] = cuts[i];
   }

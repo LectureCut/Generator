@@ -11,13 +11,13 @@ class Generator(ConanFile):
   settings = "os", "compiler", "build_type", "arch"
 
   requires = (
-    "ffmpeg/5.1@#345de2be65b10978a2c94f5de14b0b56",
+    "ffmpeg/5.1",
   )
 
   def generate(self):
     tc = CMakeToolchain(self)
     if self.settings.os == "Windows":
-      tc.generator = "Visual Studio 17"
+      tc.generator = "Visual Studio 16"
     tc.blocks["cppstd"].values = {"cppstd": "20"}
     tc.generate()
 
