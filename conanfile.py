@@ -17,7 +17,7 @@ class Generator(ConanFile):
   def generate(self):
     tc = CMakeToolchain(self)
     if self.settings.os == "Windows":
-      tc.generator = "Visual Studio 16"
+      tc.generator = "Visual Studio 17"
     tc.blocks["cppstd"].values = {"cppstd": "20"}
     tc.generate()
 
@@ -46,6 +46,7 @@ class Generator(ConanFile):
     self.options["ffmpeg"].with_lzma = False
     self.options["ffmpeg"].with_libiconv = False
     self.options["ffmpeg"].with_freetype = False
+    self.options["ffmpeg"].with_libdav1d = False
     self.options["ffmpeg"].with_openjpeg = False
     self.options["ffmpeg"].with_openh264 = False
     self.options["ffmpeg"].with_opus = False
@@ -63,6 +64,7 @@ class Generator(ConanFile):
     self.options["ffmpeg"].with_pulse = False
     self.options["ffmpeg"].with_vaapi = False
     self.options["ffmpeg"].with_vdpau = False
+    self.options["ffmpeg"].with_libaom = False
     self.options["ffmpeg"].with_xcb = False
     self.options["ffmpeg"].with_appkit = False
     self.options["ffmpeg"].with_avfoundation = False
@@ -70,6 +72,7 @@ class Generator(ConanFile):
     self.options["ffmpeg"].with_audiotoolbox = False
     self.options["ffmpeg"].with_videotoolbox = False
     self.options["ffmpeg"].with_programs = False
+    self.options["ffmpeg"].with_libsvtav1 = False
     
 
   def build(self):
