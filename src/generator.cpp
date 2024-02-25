@@ -28,13 +28,32 @@ const char* version()
 void init() {
 }
 
+ArgumentList get_arguments() {
+  Argument *args = new Argument[2]{
+    { 'a', "aggressiveness", "The aggressiveness of the VAD (0-3)", false, false },
+    { 0, "invert", "Invert the cuts", false, true }
+  };
+
+  return { 2, args };
+}
+
 result generate(
   const char *file,
-  int aggressiveness,
-  bool invert,
+  ArgumentResultList* args,
   progress_callback* progress
 )
 {
+  int aggressiveness = 2;
+  bool invert = false;
+
+  for (int i = 0; i < args->num_args; i++) {
+    if (strcmp(args->args[i].name, "aggressiveness") == 0) {
+      aggressiveness = atoi(args->args[i].value);
+    } else if (strcmp(args->args[i].name, "invert") == 0) {
+      invert = true;
+    }
+  }
+
   // ================
   // INPUT VALIDATION
   // ================

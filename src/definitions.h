@@ -34,7 +34,7 @@ public:
     return i;
   }
 
-  int size() {
+  size_t size() {
     std::lock_guard<std::mutex> lock(mutex);
     return queue.size();
   }
