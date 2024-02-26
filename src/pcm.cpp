@@ -10,7 +10,7 @@ extern "C" {
 #include "libswresample/swresample.h"
 }
 
-bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_callback* error) {
+bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, progress_callback* progress, error_callback* error) {
   av_log_set_level(AV_LOG_QUIET);
   
   avformat_network_init();
@@ -22,7 +22,6 @@ bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_cal
   AVFrame* frame = nullptr;
   SwrContext* swr_ctx = nullptr;
 
-  // int audio_stream_index = -1;
   int ret = 0;
 
   if (avformat_open_input(&format_ctx, file, nullptr, nullptr) != 0) {
@@ -34,6 +33,8 @@ bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_cal
     error("Failed to find stream info");
     return false;
   }
+
+  double duration = format_ctx->duration / (double)AV_TIME_BASE;
 
   if (stream_index != -1) {
     if (stream_index >= format_ctx->nb_streams) {
@@ -108,46 +109,57 @@ bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_cal
     return false;
   }
 
+  int n = 0;
+
+  AVRational tb = format_ctx->streams[stream_index]->time_base;
+
   while (av_read_frame(format_ctx, &packet) >= 0) {
-    if (packet.stream_index == stream_index) {
-      ret = avcodec_send_packet(codec_ctx, &packet);
-      if (ret < 0) {
-        break; // Error or end of stream.
+    if (packet.stream_index != stream_index) 
+      continue;
+    
+    // calculate progress
+    if (progress && (++n)%1000 == 0) {
+      double pts = (double)packet.pts * tb.num / tb.den;
+      double current = (double)pts / duration;
+      // std::cout << current << std::endl;
+      progress(PROGRESS_BAR_NAME, current);
+    }
+
+    ret = avcodec_send_packet(codec_ctx, &packet);
+    if (ret < 0) {
+      break; // Error or end of stream.
+    }
+
+    while (ret >= 0) {
+      ret = avcodec_receive_frame(codec_ctx, frame);
+      if (ret == AVERROR(EAGAIN)) { // Need more data.
+        break;
+      } else if (ret == AVERROR_EOF) { // End of stream.
+        break;
+      } else if (ret < 0) { // Error.
+        error("Error while decoding");
+        return false;
       }
 
-      while (ret >= 0) {
-        ret = avcodec_receive_frame(codec_ctx, frame);
-        if (ret == AVERROR(EAGAIN)) { // Need more data.
-          break;
-        } else if (ret == AVERROR_EOF) { // End of stream.
-          break;
-        } else if (ret < 0) { // Error.
-          error("Error while decoding");
-          return false;
-        }
+      uint8_t* data = nullptr;
+      if (av_samples_alloc(&data,
+                            nullptr,
+                            1, // mono
+                            frame->nb_samples,
+                            AV_SAMPLE_FMT_S16,
+                            0) < 0) {
+        error("Failed to allocate samples");
+        return false;
+      }
+      int num_samples = swr_convert(swr_ctx,
+                                    &data,
+                                    frame->nb_samples,
+                                    (const uint8_t**)frame->data,
+                                    frame->nb_samples);
 
-        uint8_t* data = nullptr;
-        if (av_samples_alloc(&data,
-                              nullptr,
-                              1, // mono
-                              frame->nb_samples,
-                              AV_SAMPLE_FMT_S16,
-                              0) < 0) {
-          error("Failed to allocate samples");
-          return false;
-        }
-        int num_samples = swr_convert(swr_ctx,
-                                      &data,
-                                      frame->nb_samples,
-                                      (const uint8_t**)frame->data,
-                                      frame->nb_samples);
-
-        if (num_samples > 0) {
-          // size_t num_bytes = num_samples * av_get_bytes_per_sample(AV_SAMPLE_FMT_S16);
-          int16_t *ptr = (int16_t*)data;
-          // audio_data.insert(audio_data.end(), ptr, ptr + num_bytes / sizeof(int16_t));
-          queue->push(ptr, num_samples);
-        }
+      if (num_samples > 0) {
+        int16_t *ptr = (int16_t*)data;
+        queue->push(ptr, num_samples);
       }
     }
 
@@ -155,6 +167,8 @@ bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_cal
   }
 
   queue->set_done();
+
+  progress(PROGRESS_BAR_NAME, 1.0);
 
   return true;
 }

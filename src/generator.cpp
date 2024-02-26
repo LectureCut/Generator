@@ -87,7 +87,7 @@ result generate(
 
   PCM_QUEUE pcm_queue;
 
-  std::thread pcm_thread(file_to_pcm, file, stream_index, &pcm_queue, error);
+  std::thread pcm_thread(file_to_pcm, file, stream_index, &pcm_queue, progress, error);
 
   // =============
   // PCM -> SPEECH

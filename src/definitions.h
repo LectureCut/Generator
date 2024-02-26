@@ -4,7 +4,9 @@
 #include <condition_variable>
 #include <iostream>
 
-#define VERSION "0.1.0"
+#define VERSION "0.1.1"
+
+#define PROGRESS_BAR_NAME "Generating"
 
 class PCM_QUEUE {
   std::deque<int16_t> queue;
