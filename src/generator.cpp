@@ -20,37 +20,48 @@
 #include "Windows.h"
 #endif
 
-const char* version()
+result error_result = {
+  { 0, nullptr },
+  { 0, 0 }
+};
+
+const char* version(error_callback* _)
 {
   return VERSION;
 }
 
-void init() {
+void init(error_callback* _) {
 }
 
-ArgumentList get_arguments() {
-  Argument *args = new Argument[2]{
+ArgumentList get_arguments(error_callback* _) {
+  constexpr int NUM_ARGS = 3;
+  Argument *args = new Argument[NUM_ARGS]{
     { 'a', "aggressiveness", "The aggressiveness of the VAD (0-3)", false, false },
-    { 0, "invert", "Invert the cuts", false, true }
+    { 0, "invert", "Invert the cuts", false, true },
+    { 's', "stream", "Index of the audio stream to process. Defaults to the first one.", false, false }
   };
 
-  return { 2, args };
+  return { NUM_ARGS, args };
 }
 
 result generate(
   const char *file,
   ArgumentResultList* args,
-  progress_callback* progress
+  progress_callback* progress,
+  error_callback* error
 )
 {
   int aggressiveness = 2;
   bool invert = false;
+  int stream_index = -1;
 
   for (int i = 0; i < args->num_args; i++) {
     if (strcmp(args->args[i].name, "aggressiveness") == 0) {
       aggressiveness = atoi(args->args[i].value);
     } else if (strcmp(args->args[i].name, "invert") == 0) {
       invert = true;
+    } else if (strcmp(args->args[i].name, "stream") == 0) {
+      stream_index = atoi(args->args[i].value);
     }
   }
 
@@ -60,13 +71,13 @@ result generate(
 
   // check if file exists
   if (!std::filesystem::exists(file)) {
-    std::cout << "File does not exist" << std::endl;
+    error("File does not exist");
     return error_result;
   }
 
   // check if aggressiveness is valid
   if (aggressiveness < 0 && aggressiveness > 3) {
-    std::cout << "Aggressiveness must be between 0 and 3" << std::endl;
+    error("Aggressiveness must be between 0 and 3");
     return error_result;
   }
 
@@ -76,7 +87,7 @@ result generate(
 
   PCM_QUEUE pcm_queue;
 
-  std::thread pcm_thread(file_to_pcm, file, &pcm_queue);
+  std::thread pcm_thread(file_to_pcm, file, stream_index, &pcm_queue, error);
 
   // =============
   // PCM -> SPEECH

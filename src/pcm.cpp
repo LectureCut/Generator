@@ -10,7 +10,7 @@ extern "C" {
 #include "libswresample/swresample.h"
 }
 
-bool file_to_pcm(const char* file, PCM_QUEUE* queue) {
+bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, error_callback* error) {
   av_log_set_level(AV_LOG_QUIET);
   
   avformat_network_init();
@@ -22,56 +22,67 @@ bool file_to_pcm(const char* file, PCM_QUEUE* queue) {
   AVFrame* frame = nullptr;
   SwrContext* swr_ctx = nullptr;
 
-  int audio_stream_index = -1;
+  // int audio_stream_index = -1;
   int ret = 0;
 
   if (avformat_open_input(&format_ctx, file, nullptr, nullptr) != 0) {
-    std::cout << "Failed to open input file" << std::endl;  
+    error("Failed to open input file");  
     return false;
   }
 
   if (avformat_find_stream_info(format_ctx, nullptr) < 0) {
-    std::cout << "Failed to find stream info" << std::endl;
+    error("Failed to find stream info");
     return false;
+  }
+
+  if (stream_index != -1) {
+    if (stream_index >= format_ctx->nb_streams) {
+      error("Invalid stream index");
+      return false;
+    }
+    if (format_ctx->streams[stream_index]->codecpar->codec_type != AVMEDIA_TYPE_AUDIO) {
+      error("Stream is not audio");
+      return false;
+    }
   }
 
   for (unsigned int i = 0; i < format_ctx->nb_streams; ++i) {
     if (format_ctx->streams[i]->codecpar->codec_type == AVMEDIA_TYPE_AUDIO) {
-      audio_stream_index = i;
+      stream_index = i;
       break;
     }
   }
 
-  if (audio_stream_index == -1) {
-    std::cout << "Failed to find audio stream" << std::endl;
+  if (stream_index == -1) {
+    error("Failed to find audio stream");
     return false;
   }
 
   codec_ctx = avcodec_alloc_context3(nullptr);
   if (!codec_ctx) {
-    std::cout << "Failed to allocate codec context" << std::endl;
+    error("Failed to allocate codec context");
     return false;
   }
 
-  if (avcodec_parameters_to_context(codec_ctx, format_ctx->streams[audio_stream_index]->codecpar) < 0) {
-    std::cout << "Failed to copy codec parameters to codec context" << std::endl;
+  if (avcodec_parameters_to_context(codec_ctx, format_ctx->streams[stream_index]->codecpar) < 0) {
+    error("Failed to copy codec parameters to codec context");
     return false;
   }
 
   codec = avcodec_find_decoder(codec_ctx->codec_id);
   if (!codec) {
-    std::cout << "Failed to find decoder" << std::endl;
+    error("Failed to find decoder");
     return false;
   }
 
   if (avcodec_open2(codec_ctx, codec, nullptr) < 0) {
-    std::cout << "Failed to open codec" << std::endl;
+    error("Failed to open codec");
     return false;
   }
 
   frame = av_frame_alloc();
   if (!frame) {
-    std::cout << "Failed to allocate frame" << std::endl;
+    error("Failed to allocate frame");
     return false;
   }
 
@@ -88,17 +99,17 @@ bool file_to_pcm(const char* file, PCM_QUEUE* queue) {
                                 nullptr);
 
   if (!swr_ctx) {
-    std::cout << "Failed to allocate SwrContext" << std::endl;
+    error("Failed to allocate SwrContext");
     return false;
   }
 
   if (swr_init(swr_ctx) < 0) {
-    std::cout << "Failed to initialize SwrContext" << std::endl;
+    error("Failed to initialize SwrContext");
     return false;
   }
 
   while (av_read_frame(format_ctx, &packet) >= 0) {
-    if (packet.stream_index == audio_stream_index) {
+    if (packet.stream_index == stream_index) {
       ret = avcodec_send_packet(codec_ctx, &packet);
       if (ret < 0) {
         break; // Error or end of stream.
@@ -111,7 +122,7 @@ bool file_to_pcm(const char* file, PCM_QUEUE* queue) {
         } else if (ret == AVERROR_EOF) { // End of stream.
           break;
         } else if (ret < 0) { // Error.
-          std::cout << "Error while decoding" << std::endl;
+          error("Error while decoding");
           return false;
         }
 
@@ -122,7 +133,7 @@ bool file_to_pcm(const char* file, PCM_QUEUE* queue) {
                               frame->nb_samples,
                               AV_SAMPLE_FMT_S16,
                               0) < 0) {
-          std::cout << "Failed to allocate samples" << std::endl;
+          error("Failed to allocate samples");
           return false;
         }
         int num_samples = swr_convert(swr_ctx,
