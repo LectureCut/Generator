@@ -106,7 +106,7 @@ result generate(
   int16_t buffer[160];
   int vad_result;
 
-  double total_video_length = 0;
+  int64_t total_video_length = 0;
 
   // for (int i = 0; i < audio_data.size(); i += 160) {
   while (pcm_queue.pop(buffer, 160) == 160) {
@@ -125,8 +125,8 @@ result generate(
       }
     }
 
-    current_cut.end += 0.01;
-    total_video_length += 0.01;
+    current_cut.end += 1;
+    total_video_length += 1;
   }
 
   pcm_thread.join();
@@ -194,7 +194,7 @@ result generate(
     total_cut_length += cuts[i].end - cuts[i].start;
   }
 
-  result result = { cutlist, {total_video_length, total_cut_length} };
+  result result = { cutlist, {total_video_length / 100., total_cut_length / 100.} };
 
   return result;
 }
