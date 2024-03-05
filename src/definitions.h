@@ -33,6 +33,7 @@ public:
       i++;
     }
     lock.unlock();
+    cv.notify_one();
     return i;
   }
 
@@ -42,7 +43,10 @@ public:
   }
 
   void set_done() {
+    std::unique_lock<std::mutex> lock(mutex);
     done = true;
+    lock.unlock();
+    cv.notify_one();
   }
 
   bool is_done() {
