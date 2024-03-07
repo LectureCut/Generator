@@ -12,7 +12,7 @@ class PCM_QUEUE {
   std::deque<int16_t> queue;
   std::mutex mutex;
   std::condition_variable cv;
-  std::atomic<bool> done = false;
+  bool done = false;
 public:
   void push(int16_t* data, int size) {
     std::unique_lock<std::mutex> lock(mutex);

@@ -92,7 +92,7 @@ bool file_to_pcm(const char* file, int stream_index, PCM_QUEUE* queue, progress_
   int res = swr_alloc_set_opts2(&swr_ctx,
                                 &mono,
                                 AV_SAMPLE_FMT_S16,
-                                16000,
+                                8000,
                                 &codec_ctx->ch_layout,
                                 codec_ctx->sample_fmt,
                                 codec_ctx->sample_rate,

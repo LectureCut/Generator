@@ -96,7 +96,7 @@ result generate(
   Fvad *vad = fvad_new();
   
   fvad_set_mode(vad, aggressiveness);
-  fvad_set_sample_rate(vad, 16000);
+  fvad_set_sample_rate(vad, 8000);
 
   std::vector<cut> cuts;
   cut current_cut;
@@ -108,11 +108,8 @@ result generate(
 
   int64_t total_video_length = 0;
 
-  // for (int i = 0; i < audio_data.size(); i += 160) {
-  while (pcm_queue.pop(buffer, 160) == 160) {
-    // memcpy(buffer, audio_data.data() + i, sizeof(int16_t) * 160);
-
-    vad_result = fvad_process(vad, buffer, 160);
+  while (pcm_queue.pop(buffer, 80) == 80) {
+    vad_result = fvad_process(vad, buffer, 80);
 
     if (vad_result == 1) {
       if (current_cut.start == 0) {
@@ -167,7 +164,7 @@ result generate(
   for (int i = 0; i < cuts.size(); i++) {
     if (i == cuts.size() - 1) {
       filtered_cuts.push_back(cuts[i]);
-    } else if (cuts[i + 1].start - cuts[i].end < 0.2) {
+    } else if (cuts[i + 1].start - cuts[i].end < 20) {
       cuts[i + 1].start = cuts[i].start;
     } else {
       filtered_cuts.push_back(cuts[i]);
@@ -177,7 +174,7 @@ result generate(
 
   // remove cuts that are shorter than .2 seconds
   cuts.erase(std::remove_if(cuts.begin(), cuts.end(), [](const cut &c) {
-    return c.end - c.start < 0.2;
+    return c.end - c.start < 20;
   }), cuts.end());
 
   // return the cuts
